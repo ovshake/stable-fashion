@@ -1,0 +1,11 @@
+.idea/
+results/
+runs/
+sample/
+checkpoints/
+*.pt
+*.pth
+*.caffemodel
+*.prototxt
+*.pyc
+Data_preprocessing/test_*
