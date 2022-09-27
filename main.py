@@ -1,161 +1,136 @@
-from diffusers import UNet2DModel, UNet2DConditionModel
-import torch
-from torch import nn
-from torch.utils.data import DataLoader
-from dataloaders.diffusion_dataloader import StableDataset
-from torchvision import transforms
-import clip
-from diffusers import DDPMScheduler
-from diffusers.optimization import get_cosine_schedule_with_warmup
-from dataclasses import dataclass
-from accelerate import Accelerator
+import gdown
+import numpy as np
+from PIL import Image
+import gdown
 import os
-from tqdm import tqdm
+import sys
+import os.path as osp
+import time
+import shutil
+from ACGPN.predict_pose import generate_pose_keypoints
+import subprocess
+import argparse
+
+parser = argparse.ArgumentParser(description='Parameters for Stable Fashion')
+parser.add_argument('--prompt',
+                    type=str,
+                    help='please insert your prompt describing the style',
+                    default='a pink shirt')
+
+parser.add_argument('--pic',
+                    type=str,
+                    help='path to your full body pic, in jpg format',
+                    default='textual_inversion/man.jpeg')
+
+args = parser.parse_args()
+mkdir_commands = [
+    "mkdir -p ACGPN/Data_preprocessing/test_color",
+    "mkdir -p ACGPN/Data_preprocessing/test_colormask",
+    "mkdir -p ACGPN/Data_preprocessing/test_edge",
+    "mkdir -p ACGPN/Data_preprocessing/test_img",
+    "mkdir -p ACGPN/Data_preprocessing/test_label",
+    "mkdir -p ACGPN/Data_preprocessing/test_mask",
+    "mkdir -p ACGPN/Data_preprocessing/test_pose",
+    "mkdir -p ACGPN/inputs",
+    "mkdir -p ACGPN/inputs/img",
+    "mkdir -p ACGPN/inputs/cloth",
+]
+
+for mkdir_command in mkdir_commands:
+    subprocess.run(mkdir_command, shell=True)
 
 
-device = "cuda"
+if not osp.exists('ACGPN/pose/pose_iter_440000.caffemodel'):
+    # os.chdir('pose/')
+    subprocess.run('gdown --id 1hOHMFHEjhoJuLEQY0Ndurn5hfiA9mwko -O ACGPN/pose/')
+    # os.chdir('..')
 
-class TrainingConfig:
-    image_size = 128  # the generated image resolution
-    train_batch_size = 1
-    eval_batch_size = 16  # how many images to sample during evaluation
-    num_epochs = 50
-    gradient_accumulation_steps = 1
-    learning_rate = 1e-4
-    lr_warmup_steps = 500
-    save_image_epochs = 10
-    save_model_epochs = 30
-    mixed_precision = 'fp16'  # `no` for float32, `fp16` for automatic mixed precision
-    output_dir = 'ddpm-fashion-128-v0'  # the model namy locally and on the HF Hub
-
-    push_to_hub = False  # whether to upload the saved model to the HF Hub
-    hub_private_repo = False
-    overwrite_output_dir = True  # overwrite the old model when re-running the notebook
-    seed = 0
-
-config = TrainingConfig()
-preprocess = transforms.Compose(
-    [
-        transforms.Resize((config.image_size, config.image_size)),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize([0.5], [0.5]),
-    ]
-)
-model =  UNet2DConditionModel(sample_size=config.image_size,
-                            in_channels=3,
-                            out_channels=3,
-                            layers_per_block=2,
-                            cross_attention_dim=768,
-                            block_out_channels=(32, 64, 128, 256)).cuda()
-
-stable_dataset = StableDataset("/data/dataset/VITON-hD/train/", transforms=preprocess)
-train_dataloader = DataLoader(stable_dataset,
-                        batch_size=config.train_batch_size,
-                        shuffle=True,
-                        num_workers=2,
-                        pin_memory=True)
-
-noise_scheduler = DDPMScheduler(num_train_timesteps=1000, tensor_format="pt")
-optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate)
-lr_scheduler = get_cosine_schedule_with_warmup(
-    optimizer=optimizer,
-    num_warmup_steps=config.lr_warmup_steps,
-    num_training_steps=(len(train_dataloader) * config.num_epochs),
-)
+if not osp.exists('ACGPN/lip_final.pth'):
+    url = 'https://drive.google.com/uc?id=1k4dllHpu0bdx38J7H28rVVLpU-kOHmnH'
+    output = 'ACGPN/lip_final.pth'
+    gdown.download(url, output, quiet=False)
 
 
-def evaluate(config, epoch, pipeline):
-    # Sample some images from random noise (this is the backward diffusion process).
-    # The default pipeline output type is `List[PIL.Image]`
-    images = pipeline(
-        batch_size = config.eval_batch_size,
-        generator=torch.manual_seed(config.seed),
-    )["sample"]
+# os.chdir('ACGPN/U_2_Net/')
+os.makedirs("ACGPN/U_2_Net/saved_models", exist_ok=True)
+os.makedirs("ACGPN/U_2_Net/saved_models/u2net", exist_ok=True)
+os.makedirs("ACGPN/U_2_Net/saved_models/u2netp", exist_ok=True)
 
-    # Make a grid out of the images
-    image_grid = make_grid(images, rows=4, cols=4)
-
-    # Save the images
-    test_dir = os.path.join(config.output_dir, "samples")
-    os.makedirs(test_dir, exist_ok=True)
-    image_grid.save(f"{test_dir}/{epoch:04d}.png")
+if not osp.exists("ACGPN/U_2_Net/saved_models/u2netp/u2netp.pth"):
+    subprocess.run("gdown --id 1rbSTGKAE-MTxBYHd-51l2hMOQPT_7EPy -O ACGPN/U_2_Net/saved_models/u2netp/u2netp.pth")
+if not osp.exists("ACGPN/U_2_Net/saved_models/u2net/u2net.pth"):
+    subprocess.run("gdown --id 1ao1ovG1Qtx4b7EoskHXmi2E9rp5CHLcZ -O ACGPN/U_2_Net/saved_models/u2net/u2net.pth")
 
 
-def train_loop(config, model, noise_scheduler, optimizer, train_dataloader, lr_scheduler):
-    # Initialize accelerator and tensorboard logging
-    accelerator = Accelerator(
-        mixed_precision=config.mixed_precision,
-        gradient_accumulation_steps=config.gradient_accumulation_steps,
-        log_with="tensorboard",
-        logging_dir=os.path.join(config.output_dir, "logs")
-    )
-    if accelerator.is_main_process:
-        if config.push_to_hub:
-            repo = init_git_repo(config, at_init=True)
-        accelerator.init_trackers("train_example")
-
-    # Prepare everything
-    # There is no specific order to remember, you just need to unpack the
-    # objects in the same order you gave them to the prepare method.
-    model, optimizer, train_dataloader, lr_scheduler = accelerator.prepare(
-        model, optimizer, train_dataloader, lr_scheduler
-    )
-
-    global_step = 0
-    model = model.half()
-    # Now you train the model
-    for epoch in range(config.num_epochs):
-        progress_bar = tqdm(total=len(train_dataloader), disable=not accelerator.is_local_main_process)
-        progress_bar.set_description(f"Epoch {epoch}")
-
-        for step, batch in enumerate(train_dataloader):
-            clean_images = batch['images'].cuda()
-            embeddings = batch["np_embedding"].cuda()
-            # Sample noise to add to the images
-            noise = torch.randn(clean_images.shape).to(clean_images.device)
-            bs = clean_images.shape[0]
-
-            # Sample a random timestep for each image
-            timesteps = torch.randint(0, noise_scheduler.num_train_timesteps, (bs,), device=clean_images.device).long()
-
-            # Add noise to the clean images according to the noise magnitude at each timestep
-            # (this is the forward diffusion process)
-            noisy_images = noise_scheduler.add_noise(clean_images, noise, timesteps)
-
-            with accelerator.accumulate(model):
-                # Predict the noise residual
-                with torch.autocast(device_type='cuda'):
-                    import ipdb; ipdb.set_trace()
-                    noise_pred = model(noisy_images.half(), encoder_hidden_states=embeddings.half(), timestep=timesteps)["sample"]
-                    loss = F.mse_loss(noise_pred, noise)
-                    accelerator.backward(loss)
-
-                    accelerator.clip_grad_norm_(model.parameters(), 1.0)
-                    optimizer.step()
-                    lr_scheduler.step()
-                    optimizer.zero_grad()
-
-            progress_bar.update(1)
-            logs = {"loss": loss.detach().item(), "lr": lr_scheduler.get_last_lr()[0], "step": global_step}
-            progress_bar.set_postfix(**logs)
-            accelerator.log(logs, step=global_step)
-            global_step += 1
-
-        # After each epoch you optionally sample some demo images with evaluate() and save the model
-        if accelerator.is_main_process:
-            pipeline = DDPMPipeline(unet=accelerator.unwrap_model(model), scheduler=noise_scheduler)
-
-            if (epoch + 1) % config.save_image_epochs == 0 or epoch == config.num_epochs - 1:
-                evaluate(config, epoch, pipeline)
-
-            if (epoch + 1) % config.save_model_epochs == 0 or epoch == config.num_epochs - 1:
-                if config.push_to_hub:
-                    push_to_hub(config, pipeline, repo, commit_message=f"Epoch {epoch}", blocking=True)
-                else:
-                    pipeline.save_pretrained(config.output_dir)
+from  ACGPN.U_2_Net import u2net_load
+from ACGPN.U_2_Net import u2net_run
+u2net = u2net_load.model(model_name = 'u2netp')
 
 
+os.makedirs("ACGPN/checkpoints", exist_ok=True)
+if not osp.exists("ACGPN/checkpoints/label2city"):
+    gdown.download('https://drive.google.com/uc?id=1UWT6esQIU_d4tUm8cjxDKMhB8joQbrFx',output='ACGPN/checkpoints/ACGPN_checkpoints.zip', quiet=False)
+    subprocess.run('unzip ACGPN/checkpoints/ACGPN_checkpoints.zip -d ACGPN/checkpoints', shell=True)
 
-if __name__ == '__main__':
-    train_loop(config, model, noise_scheduler, optimizer, train_dataloader, lr_scheduler)
+# Insert Image of Cloth from LD
+
+
+if osp.exists('textual_inversion/outputs/txt2img-samples'):
+    shutil.rmtree('textual_inversion/outputs/txt2img-samples')
+
+if not osp.exists('textual_inversion/models/ldm/text2img-large/model.ckpt'):
+    os.makedirs('textual_inversion/models/ldm/text2img-large/', exist_ok=True)
+    subprocess.run('wget -O textual_inversion/models/ldm/text2img-large/model.ckpt https://ommer-lab.com/files/latent-diffusion/nitro/txt2img-f8-large/model.ckpt', shell=True)
+
+if not osp.exists('textual_inversion/finetuned_models/'):
+    os.makedirs('textual_inversion/finetuned_models/', exist_ok=True)
+    subprocess.run('gdown --id 1AsDkbfZnQUwTof_I2ajRxsTjuYyeVwra -O textual_inversion/finetuned_models/', shell=True)
+
+if osp.exists('textual_inversion/outputs'):
+    shutil.rmtree('textual_inversion/outputs')
+
+subprocess.run(f"python textual_inversion/scripts/txt2img.py --ddim_eta 0.0 --n_samples 1 --outdir textual_inversion/outputs --n_iter 2 --scale 10.0 --ddim_steps 50 --embedding_path textual_inversion/finetuned_models/embeddings_gs-6099.pt --ckpt_path textual_inversion/models/ldm/text2img-large/model.ckpt --prompt '{args.prompt} on * in the style of *' ", shell=True)
+
+shutil.copy('textual_inversion/outputs/samples/0000.jpg', 'ACGPN/inputs/cloth/0000.jpg')
+shutil.rmtree('textual_inversion/outputs/')
+
+
+# Insert Image of Person
+# subprocess.run('gdown --id 1CWpTgqKGuZwgR8sxMfg6qKuy3wCAoOjc -O textual_inversion/man.jpeg', shell=True)
+# shutil.copy('textual_inversion/man.jpeg', 'ACGPN/inputs/img/0000.jpg')
+shutil.copy(args.pic, 'ACGPN/inputs/img/0000.jpg')
+
+cloth_name = '000001_1.png'
+cloth_path = os.path.join('ACGPN/inputs/cloth', sorted(os.listdir('ACGPN/inputs/cloth'))[0])
+cloth = Image.open(cloth_path)
+cloth = cloth.resize((192, 256), Image.BICUBIC).convert('RGB')
+cloth.save(os.path.join('ACGPN/Data_preprocessing/test_color', cloth_name))
+
+u2net_run.infer(u2net, 'ACGPN/Data_preprocessing/test_color', 'ACGPN/Data_preprocessing/test_edge')
+
+
+start_time = time.time()
+img_name = '000001_0.png'
+img_path = os.path.join('ACGPN/inputs/img', sorted(os.listdir('ACGPN/inputs/img'))[0])
+img = Image.open(img_path)
+img = img.resize((192,256), Image.BICUBIC)
+
+img_path = os.path.join('ACGPN/Data_preprocessing/test_img', img_name)
+img.save(img_path)
+resize_time = time.time()
+print('Resized image in {}s'.format(resize_time-start_time))
+
+subprocess.run("python3 ACGPN/Self-Correction-Human-Parsing-for-ACGPN/simple_extractor.py --dataset 'lip' --model-restore 'ACGPN/lip_final.pth' --input-dir 'ACGPN/Data_preprocessing/test_img' --output-dir 'ACGPN/Data_preprocessing/test_label'", shell=True)
+parse_time = time.time()
+print('Parsing generated in {}s'.format(parse_time-resize_time))
+
+pose_path = os.path.join('ACGPN/Data_preprocessing/test_pose', img_name.replace('.png', '_keypoints.json'))
+generate_pose_keypoints(img_path, pose_path)
+pose_time = time.time()
+print('Pose map generated in {}s'.format(pose_time-parse_time))
+
+with open('ACGPN/Data_preprocessing/test_pairs.txt','w') as f:
+    f.write('000001_0.png 000001_1.png')
+
+subprocess.run('python ACGPN/test.py', shell=True)
+shutil.copy('ACGPN/results/test/try-on/000001_0.png', 'result.png')

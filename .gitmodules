@@ -1,6 +1,0 @@
-[submodule "textual_inversion"]
-	path = textual_inversion
-	url = git@github.com:ovshake/textual_inversion.git
-[submodule "ACGPN"]
-	path = ACGPN
-	url = git@github.com:ovshake/ACGPN.git
