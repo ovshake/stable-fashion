@@ -1,6 +1,6 @@
 # Stable Fashion
-
-
+ <!-- ![image info](assets/logo-black.png  =x250)-->
+ <img align="center" src="assets/logo-black.png " alt="drawing" width="300" />
 
 *How would you look like in a gray jacket or a pink striped t-shirt?*
 
@@ -27,9 +27,7 @@ either `pip` or `conda` to install them.
 ```
 python main.py --prompt <your prompt> --pic <path to your full length picture>
 ```
-
-
-
+4. The image will be saved as `result.png` in the root directory of the project.
 # Things to Keep in Mind
 
 1. Please ensure you only describe the clothing item in your prompt. Any other information throws off the model for the time being.
@@ -54,6 +52,10 @@ from [Towards Photo-Realistic Virtual Try-On by Adaptively Generating↔Preservi
 # Results
 
 These are some of the results of the prompts on a stock full length image.
+
+| Original Image | Prompt: a yellow striped shirt on white background  | Prompt: A pink buttoned jacket |
+|----------------|---------------------------------|--------------------------------|
+|  ![image info](assets/stockimage.jpeg)              |   ![image info](assets/yellow.png)                               |   ![image info](assets/pink.png)                             |
 
 # Next Steps
 
