@@ -28,6 +28,8 @@ either `pip` or `conda` to install them.
 python main.py --prompt <your prompt> --pic <path to your full length picture>
 ```
 
+
+
 # Things to Keep in Mind
 
 1. Please ensure you only describe the clothing item in your prompt. Any other information throws off the model for the time being.
