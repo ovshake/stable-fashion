@@ -13,7 +13,7 @@ charset-normalizer==2.1.1
 clip @ git+https://github.com/openai/CLIP.git@d50d76daa670286dd6cacf3bcd80b5e4823fc8e1
 datasets==2.4.0
 decorator==5.1.1
-diffusers @ git+https://github.com/huggingface/diffusers@6b02323a602a66841729c3a5d60844b24aa81ff2
+diffusers @ git+https://github.com/ovshake/diffusers@5bbecb751764248755943b57d900ae14a7f43a75
 dill==0.3.5.1
 executing==1.0.0
 filelock==3.8.0
