@@ -17,17 +17,31 @@ Introducing Stable Fashion, a prompt-based on try-on app (well, only code for no
 1. Please ensure `anaconda` is installed in your system. If not, you can follow the instructions [here](https://www.anaconda.com/products/distribution).
 2. Run the following command
 ```
-conda env create -f environment.yml
-conda activate ldm
+conda create -n sf python=3.9
+conda activate sf
+cat requirements.txt | xargs -n 1 pip install
 ```
-> Note that there might be certain packages which are not present in `environment.yml`. Please install those packages seperately. You can use
-either `pip` or `conda` to install them.
 
-3. To run the pipeline, use this command
+3. To run the pipeline, use this sample command
 ```
-python main.py --prompt <your prompt> --pic <path to your full length picture>
+python main.py --image ../../assets/stockimage.jpeg --resolution 512  --prompt "yellow shirt"  --part upper  --num_steps 25   --output stock_yellow.jpg
 ```
-4. The image will be saved as `result.png` in the root directory of the project.
+Other available options are
+```
+Stable Fashion API, allows you to picture yourself in any cloth your imagination can think of!
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --image IMAGE         path to image
+  --part {upper,lower}
+  --resolution {256,512,1024,2048}
+  --prompt PROMPT
+  --num_steps NUM_STEPS
+  --guidance_scale GUIDANCE_SCALE
+  --rembg
+  --output OUTPUT
+```
+4. The image will be saved as whatever name you provide with `--output`. The default is `output.jpg`. in the root directory of the project.
 # Things to Keep in Mind
 
 1. Please ensure you only describe the clothing item in your prompt. Any other information throws off the model for the time being.
@@ -42,10 +56,7 @@ python main.py --prompt <your prompt> --pic <path to your full length picture>
 
 
 # Models Used
-For this pipeline, we borrowed the [LDM](https://github.com/CompVis/latent-diffusion) pipeline and finetuned it using
-[Textual Inversion](https://github.com/rinongal/textual_inversion) on few randomly selected images from the
-[ViTON-HD](https://drive.google.com/file/d/1lHNujZIq6KVeGOOdwnOXVCSR5E7Kv6xv/view?usp=sharing) dataset. To enable try-on, we borrowed code
-from [Towards Photo-Realistic Virtual Try-On by Adaptively Generating↔Preserving Image Content](https://github.com/switchablenorms/DeepFashion_Try_On).
+For this app, first we segment the human out of the image. For this we use [rembg](https://github.com/danielgatis/rembg). Then we segment the upper and lower clothes using the [cloth segmentation repository](https://github.com/levindabhi/cloth-segmentation). On top of this we run the [stable diffusion inpainting pipeline](https://huggingface.co/runwayml/stable-diffusion-inpainting) from huggingface.
 
 
 
@@ -53,25 +64,20 @@ from [Towards Photo-Realistic Virtual Try-On by Adaptively Generating↔Preservi
 
 These are some of the results of the prompts on a stock full length image.
 
-| Original Image | Prompt: a yellow striped shirt on white background  | Prompt: A pink buttoned jacket |
+| Original Image | Prompt: a yellow shirt  | Prompt: A pink shirt |
 |----------------|---------------------------------|--------------------------------|
-|  ![image info](assets/stockimage.jpeg)              |   ![image info](assets/yellow.png)                               |   ![image info](assets/pink.png)                             |
+|  ![image info](assets/stockimage.jpeg)              |   ![image info](assets/stock_yellow.jpg)                               |   ![image info](assets/pink.png)                             |
 
 # Next Steps
 
-- [ ] Converting this to a single read, single write code-base.
-- [ ] Adding CPU support
+- [x] Converting this to a single read, single write code-base.
+- [x] Adding CPU support
 - [ ] Wrapping this up in an API and hosting it
 - [ ] Making an UI
 
 # Acknowledgments
 
-Thanks to the wonderful authors who have open-sourced their code for the public to use. I have used code and weights from the following
-repostories
-
-1. https://github.com/switchablenorms/DeepFashion_Try_On
-2. https://github.com/CompVis/latent-diffusion
-3. https://github.com/rinongal/textual_inversion
+Thanks to huggingface, runway-ml and @levindabhi for their wonderful codebases.
 
 # Feedback
 This is a hobby project and has some pretty gaping holes. I am very happy to recieve feedback and PRs. You can reach out to me on

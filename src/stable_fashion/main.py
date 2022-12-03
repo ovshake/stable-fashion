@@ -36,6 +36,7 @@ def parse_arguments():
     parser.add_argument('--num_steps', type=int, default=5)
     parser.add_argument('--guidance_scale', type=float, default=7.5)
     parser.add_argument('--rembg', action='store_true')
+    parser.add_argument('--output', default='output.jpg', type=str)
     args, _ = parser.parse_known_args()
     return args
 
@@ -56,11 +57,12 @@ def change_bg_color(rgba_image, color):
 
 
 def load_inpainting_pipeline():
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     inpainting_pipeline = StableDiffusionInpaintPipeline.from_pretrained(
             "runwayml/stable-diffusion-inpainting",
             revision="fp16",
-            torch_dtype=torch.float16,
-        ).to("cuda")
+            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        ).to(device)
     return inpainting_pipeline
 def process_image(args, inpainting_pipeline, net):
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -69,14 +71,13 @@ def process_image(args, inpainting_pipeline, net):
     transforms_list += [transforms.ToTensor()]
     transforms_list += [Normalize_image(0.5, 0.5)]
     transform_rgb = transforms.Compose(transforms_list)
-    img = Image.open(image_path).convert("RGB")
+    img = Image.open(image_path)
+    img = img.convert("RGB")
     img = img.resize((args.resolution, args.resolution))
     if args.rembg:
         img_with_green_bg = remove(img)
-        img_with_green_bg.save("mask.png")
         img_with_green_bg = change_bg_color(img_with_green_bg, color="GREEN")
         img_with_green_bg = img_with_green_bg.convert("RGB")
-        img_with_green_bg.save("mask.jpg")
     else:
         img_with_green_bg = img
     image_tensor = transform_rgb(img_with_green_bg)
@@ -93,7 +94,6 @@ def process_image(args, inpainting_pipeline, net):
     output_arr[~mask] = 0
     output_arr *= 255
     mask_PIL = Image.fromarray(output_arr.astype("uint8"), mode="L")
-    mask_PIL.save('mask_pil.jpg')
     clothed_image_from_pipeline = inpainting_pipeline(prompt=args.prompt,
                                                     image=img_with_green_bg,
                                                     mask_image=mask_PIL,
@@ -104,18 +104,9 @@ def process_image(args, inpainting_pipeline, net):
     clothed_image_from_pipeline = remove(clothed_image_from_pipeline)
     clothed_image_from_pipeline = change_bg_color(clothed_image_from_pipeline, "WHITE")
     return clothed_image_from_pipeline.convert("RGB")
-    clothed_image_from_pipeline = np.asarray(clothed_image_from_pipeline)
-    mask = mask.astype('float')
-    # matted_image = mask[..., None] * clothed_image_from_pipeline + (1 - mask[..., None]) * img
-    matted_image = mask[..., None] * clothed_image_from_pipeline
-    matted_image = Image.fromarray(matted_image.astype("uint8"), mode="RGB")
-    matted_image = remove(matted_image)
-    matted_image = change_bg_color(matted_image, color="WHITE")
-    return matted_image.convert("RGB")
-
 if __name__ == '__main__':
     args = parse_arguments()
     net = load_u2net()
     inpainting_pipeline = load_inpainting_pipeline()
     result_image = process_image(args, inpainting_pipeline, net)
-    result_image.save('test1.jpg')
+    result_image.save(args.output)
