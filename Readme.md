@@ -59,6 +59,8 @@ optional arguments:
 
 3. Please ensure your full length picture is taken from front, with a whitish background. It helps the model to isolate you in the picture. **NEW**: now you can use the `rembg` option to turn a normal in-the-wild picture into a picture with white background.
 
+4. You can mention which part of the picture you want to dress up, `upper` (torso) or `lower` (pants, trousers etc)
+
 
 # Models Used
 For this app, first we segment the human out of the image. For this we use [rembg](https://github.com/danielgatis/rembg). Then we segment the upper and lower clothes using the [cloth segmentation repository](https://github.com/levindabhi/cloth-segmentation). On top of this we run the [stable diffusion inpainting pipeline](https://huggingface.co/runwayml/stable-diffusion-inpainting) from huggingface.
