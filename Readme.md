@@ -1,4 +1,5 @@
 # Stable Fashion
+[![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/maiti/stable-fashion)
  <!-- ![image info](assets/logo-black.png  =x250)-->
  <img align="center" src="assets/logo-black.png " alt="drawing" width="300" />
 
@@ -11,6 +12,10 @@ Why don't we ease the stress we put on our imagination by using state of the art
 
 Introducing Stable Fashion, a prompt-based on try-on app (well, only code for now), where you can write prompts such as "**A pink t shirt**" or
 "**A yellow adidas shirt with black stripes**" and it would edit to put those clothing items on a full length picture of yours.
+
+**NEW**
+
+Now you can try out the demo on [Huggingface Spaces](https://huggingface.co/spaces): [![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/maiti/stable-fashion)
 
 # Instructions to Run
 
@@ -73,7 +78,7 @@ These are some of the results of the prompts on a stock full length image.
 - [x] Converting this to a single read, single write code-base.
 - [x] Adding CPU support
 - [ ] Wrapping this up in an API and hosting it
-- [ ] Making an UI
+- [x] Making an UI (put on HF spaces for now)
 
 # Acknowledgments
 
