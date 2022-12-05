@@ -55,9 +55,9 @@ optional arguments:
 
 :x: A green hoodie wrapped around the waist
 
-2. Currently, the code relies on a GPU. Please ensure you have an NVIDIA GPU with the appropiate CUDA kernel.
+2. ~~Currently, the code relies on a GPU. Please ensure you have an NVIDIA GPU with the appropiate CUDA kernel.~~ Now you can run the pipeline on CPU as well, although it will take considerably more time.
 
-3. Please ensure your full length picture is taken from front, with a whitish background. It helps the model to isolate you in the picture.
+3. Please ensure your full length picture is taken from front, with a whitish background. It helps the model to isolate you in the picture. **NEW**: now you can use the `rembg` option to turn a normal in-the-wild picture into a picture with white background.
 
 
 # Models Used
