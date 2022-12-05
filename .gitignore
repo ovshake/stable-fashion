@@ -13,6 +13,4 @@ ddpm-fashion-128-v0/
 **/__pycache__/**
 *.pth
 *.pt
-*.jpg
 *.ckpt
-*.png
